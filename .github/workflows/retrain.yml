@@ -1,0 +1,28 @@
+name: Model Retraining
+on:
+  repository_dispatch:
+    types: [model_decay]
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Retrain & Compare
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_HUB_ID: ${{ vars.HF_HUB_ID }}
+        run: |
+          pip install -r requirements.txt
+          python -c "
+          from src.data_logic import load_and_validate_data
+          from src.train import train_model
+          from src.evaluate import champion_challenger_check
+          import os
+          train_df, test_df = load_and_validate_data()
+          trainer, model, tokenizer = train_model(train_df, test_df)
+          model.save_pretrained('./challenger')
+          is_better, f1 = champion_challenger_check('./challenger', test_df)
+          if is_better:
+              model.push_to_hub(os.environ['HF_TOKEN'], repo_id=os.environ['HF_HUB_ID'])
+              tokenizer.push_to_hub(os.environ['HF_TOKEN'], repo_id=os.environ['HF_HUB_ID'])
+          "

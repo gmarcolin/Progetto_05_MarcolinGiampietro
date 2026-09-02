@@ -1,0 +1,21 @@
+name: Deploy to Space
+on:
+  workflow_run:
+    workflows: ["Model Retraining"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths: ['src/app.py', 'config.yaml']
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Push to HF
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git remote add space https://oauth2:$HF_TOKEN@huggingface.co/spaces/${{ vars.HF_USERNAME }}/${{ vars.HF_SPACE_NAME }}
+          git push --force space main
