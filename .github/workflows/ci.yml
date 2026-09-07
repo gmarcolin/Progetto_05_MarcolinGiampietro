@@ -17,6 +17,14 @@ jobs:
         run: flake8 .
       - name: Unit Tests
         run: pytest tests/unit/
+      - name: Show environment
+        run: |
+          python --version
+          pip --version
+          pip show transformers
+          pip show huggingface-hub
+          pip show pydantic
+          pip show gradio        
       - name: Integration Tests
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
