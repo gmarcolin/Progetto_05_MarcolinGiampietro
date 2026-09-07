@@ -5,6 +5,7 @@ import yaml
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
+
 def train_model(train_df, test_df, push_to_hub=False):
     model_name = config['model']['base_name']
     tokenizer = AutoTokenizer.from_pretrained(model_name)
