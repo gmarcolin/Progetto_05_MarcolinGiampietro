@@ -22,7 +22,7 @@ def predict(text):
         # Prendiamo il risultato con lo score più alto
         prediction = max(response, key=lambda x: x['score'])
         return f"Label: {prediction['label']} (Conf: {prediction['score']:.2f})"
-        
+
     except Exception as e:
         err = (
             f"Errore nell'interrogare il Model Hub: {str(e)}. "
