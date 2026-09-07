@@ -7,7 +7,9 @@ with open("config.yaml", "r") as f:
 
 try:
     classifier = pipeline("sentiment-analysis", model=config['model']['hub_id'])
-except:
+
+except Exception as e:
+    print(f"Unable to load remote model: {e}")
     classifier = pipeline("sentiment-analysis", model=config['model']['base_name'])
 
 def predict(text):
