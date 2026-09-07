@@ -1,25 +1,39 @@
 import gradio as gr
-from transformers import pipeline
+from huggingface_hub import InferenceClient
 import yaml
+import os
 
+# Carichiamo la configurazione
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
-try:
-    classifier = pipeline("sentiment-analysis",
-                          model=config['model']['hub_id'],
-                          trust_remote_code=True)
+# Usiamo il token dai segreti di sistema
+HF_TOKEN = os.getenv("HF_TOKEN")
+model_id = config['model']['hub_id']
 
-except Exception as e:
-    print(f"Unable to load remote model: {e}")
-    classifier = pipeline("sentiment-analysis",
-                          model=config['model']['base_name'],
-                          trust_remote_code=True)
+# Client per le API Serverless di Hugging Face
+client = InferenceClient(model=model_id, token=HF_TOKEN)
 
 
 def predict(text):
-    res = classifier(text)[0]
-    return f"{res['label']} ({res['score']:.2f})"
+    try:
+        # Chiamata API al Model Hub
+        response = client.text_classification(text)
+        # Prendiamo il risultato con lo score più alto
+        prediction = max(response, key=lambda x: x['score'])
+        return f"Label: {prediction['label']} (Conf: {prediction['score']:.2f})"
+    except Exception as e:
+        return f"Errore nell'interrogare il Model Hub: {str(e)}. Assicurati che il modello sia pubblico o che il token sia corretto."
 
 
-gr.Interface(fn=predict, inputs="text", outputs="text").launch()
+# Interfaccia Gradio
+demo = gr.Interface(
+    fn=predict, 
+    inputs=gr.Textbox(placeholder="Inserisci un tweet qui..."), 
+    outputs="text",
+    title="Sentiment Analysis - Serverless Mode",
+    description=f"Questa app interroga il modello registrato su: {model_id}"
+)
+
+if __name__ == "__main__":
+    demo.launch(server_name="0.0.0.0", server_port=7860)

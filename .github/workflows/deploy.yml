@@ -1,4 +1,5 @@
-name: Deploy to Space
+name: Deploy App
+
 on:
   workflow_run:
     workflows: ["Model Retraining"]
@@ -6,16 +7,26 @@ on:
   push:
     branches: [main]
     paths: ['src/app.py', 'config.yaml']
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Push to HF
+      
+      # Invece di lottare con lo Space, aggiorniamo il file README del Modello
+      # per attivare le Inference API sul Model Hub.
+      - name: Ensure Inference API is active
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git remote add space https://oauth2:$HF_TOKEN@huggingface.co/spaces/${{ vars.HF_USERNAME }}/${{ vars.HF_SPACE_NAME }}
-          git push --force space main
+          pip install huggingface_hub
+          python -c "from huggingface_hub import metadata_update; metadata_update('${{ vars.HF_HUB_ID }}', {'inference': True}, token='${{ env.HF_TOKEN }}')"
+
+      # Opzionale: Se hai creato uno Space (anche se limitato), carichiamo l'app leggera
+      #- name: Sync Space Code
+      #  env:
+      #    HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      #  run: |
+      #    git remote add space https://oauth2:$HF_TOKEN@huggingface.co/spaces/${{ vars.HF_USERNAME }}/${{ vars.HF_SPACE_NAME }} || true
+      #    git push --force space main
