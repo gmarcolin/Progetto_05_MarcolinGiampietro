@@ -1,5 +1,7 @@
 from transformers import pipeline
 import yaml
+
+
 def test_inf():
     with open("config.yaml", "r") as f:
         cfg = yaml.safe_load(f)
