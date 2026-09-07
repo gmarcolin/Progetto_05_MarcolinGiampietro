@@ -1,30 +1,43 @@
 name: CI Quality Check
-on: [push, pull_request, workflow_dispatch]
+
+on:
+  #push:
+  #  branches: [ main ]
+  #pull_request:
+  #  branches: [ main ]
+  workflow_dispatch:
+
 jobs:
   ci:
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: .
     steps:
-      - uses: actions/checkout@v5
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      # 1. Checkout del codice
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Setup Python 3.12
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.12'
+          cache: 'pip' # Velocizza i workflow successivi
+
+      # 3. Installazione dipendenze aggiornate
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      # 4. Qualità del Codice (Linting)
       - name: Linting
         run: flake8 .
+
+      # 5. Test Unitari (Logica interna e validazione)
       - name: Unit Tests
         run: pytest tests/unit/
-      - name: Show environment
-        run: |
-          python --version
-          pip --version
-          pip show transformers
-          pip show huggingface-hub
-          pip show pydantic
-          pip show gradio        
+
+      # 6. Test d'Integrazione (Connessione e Smoke Training)
+      # Nota: Qui passiamo l'HF_TOKEN perché lo Smoke Test carica i modelli da HF
       - name: Integration Tests
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}

@@ -6,11 +6,15 @@ with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 try:
-    classifier = pipeline("sentiment-analysis", model=config['model']['hub_id'])
+    classifier = pipeline("sentiment-analysis", 
+                          model=config['model']['hub_id'], 
+                          trust_remote_code=True)
 
-except Exception as e:
+except Exception:
     print(f"Unable to load remote model: {e}")
-    classifier = pipeline("sentiment-analysis", model=config['model']['base_name'])
+    classifier = pipeline("sentiment-analysis", 
+                          model=config['model']['base_name'], 
+                          trust_remote_code=True)
 
 
 def predict(text):

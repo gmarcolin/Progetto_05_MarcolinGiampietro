@@ -19,7 +19,7 @@ def train_model(train_df, test_df, push_to_hub=False):
 
     args = TrainingArguments(
         output_dir="./results",
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         num_train_epochs=1,
         per_device_train_batch_size=8,
         push_to_hub=push_to_hub,

@@ -1,6 +1,6 @@
 model:
   base_name: "cardiffnlp/twitter-roberta-base-sentiment-latest"
-  hub_id: "IL_TUO_USER/sentiment-roberta-deploy" # Sostituisci col tuo ID
+  hub_id: "gm84/sentiment-roberta-deploy"
   threshold_f1: 0.75 
 
 data:

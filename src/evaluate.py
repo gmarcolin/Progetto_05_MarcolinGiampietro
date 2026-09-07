@@ -15,7 +15,7 @@ def get_model_f1(model_path, test_df):
     y_pred = [mapping[p['label']] if p['label'] in mapping else int(p['label'].split('_')[-1]) for p in preds]
     y_true = test_df['label'].tolist()
 
-    f1_metric = evaluate.load("f1")
+    f1_metric = evaluate.load("f1", trust_remote_code=True)
     return f1_metric.compute(predictions=y_pred, references=y_true, average="weighted")['f1']
 
 
