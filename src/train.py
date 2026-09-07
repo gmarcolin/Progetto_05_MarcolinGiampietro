@@ -38,5 +38,5 @@ def train_model(train_df, test_df, push_to_hub=False):
     )
 
     trainer.train()
-    
+
     return trainer, model, tokenizer
