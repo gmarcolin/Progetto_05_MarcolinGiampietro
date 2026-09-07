@@ -23,13 +23,15 @@ def predict(text):
         prediction = max(response, key=lambda x: x['score'])
         return f"Label: {prediction['label']} (Conf: {prediction['score']:.2f})"
     except Exception as e:
-        return f"Errore nell'interrogare il Model Hub: {str(e)}. Assicurati che il modello sia pubblico o che il token sia corretto."
+        err = f"Errore nell'interrogare il Model Hub: {str(e)}. "
+        err += f"Assicurati che il modello sia pubblico o che il token sia corretto."
+        return err
 
 
 # Interfaccia Gradio
 demo = gr.Interface(
-    fn=predict, 
-    inputs=gr.Textbox(placeholder="Inserisci un tweet qui..."), 
+    fn=predict,
+    inputs=gr.Textbox(placeholder="Inserisci un tweet qui..."),
     outputs="text",
     title="Sentiment Analysis - Serverless Mode",
     description=f"Questa app interroga il modello registrato su: {model_id}"
