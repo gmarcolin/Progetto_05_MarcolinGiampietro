@@ -10,18 +10,19 @@ on:
 
 jobs:
   deploy:
+    if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      # Invece di lottare con lo Space, aggiorniamo il file README del Modello
-      # per attivare le Inference API sul Model Hub.
-      - name: Ensure Inference API is active
+      # Configura il task del modello sul Model Hub
+      - name: Configure Model Hub metadata
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           pip install huggingface_hub
-          python -c "from huggingface_hub import metadata_update; metadata_update('${{ vars.HF_HUB_ID }}', {'inference': True}, token='${{ env.HF_TOKEN }}')"
+          python -c "from huggingface_hub import metadata_update; metadata_update('${{ vars.HF_HUB_ID }}', \
+          {'pipeline_tag': 'text-classification'}, overwrite=True)"
 
       # Opzionale: Se hai creato uno Space (anche se limitato), carichiamo l'app leggera
       #- name: Sync Space Code

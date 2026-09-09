@@ -26,6 +26,7 @@ client = InferenceClient(
 
 def predict(text):
     try:
+        # Chiamata API al Model Hub
         response = client.text_classification(
             text,
             model=model_id
@@ -33,6 +34,7 @@ def predict(text):
 
         print("Risposta HF:", response)
 
+        # Prendiamo il risultato con lo score più alto
         prediction = max(response, key=lambda x: x["score"])
 
         return (
@@ -41,13 +43,14 @@ def predict(text):
         )
 
     except Exception as e:
-        print(f"ERRORE: {type(e).__name__}: {repr(e)}")
-
-        return (
-            f"ERRORE: {type(e).__name__}: {repr(e)}"
+        err = (
+            f"Errore nell'interrogare il Model Hub: {type(e).__name__}: {repr(e)}. "
+            #"Assicurati che il modello sia pubblico o che il token sia corretto."
         )
+        return err
 
 
+# Interfaccia Gradio
 demo = gr.Interface(
     fn=predict,
     inputs=gr.Textbox(placeholder="Inserisci un tweet qui..."),
