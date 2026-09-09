@@ -10,12 +10,12 @@ with open("config.yaml", "r") as f:
 model_id = config["model"]["hub_id"]
 
 # Token HF configurato nei Secrets dello Space
-#HF_TOKEN = os.getenv("HF_TOKEN")
+# HF_TOKEN = os.getenv("HF_TOKEN")
 
 # Diagnostica
-#print(f"Model ID: {model_id}")
-#print(f"HF_TOKEN presente: {HF_TOKEN is not None}")
-#print(f"HF_TOKEN vuoto: {not HF_TOKEN if HF_TOKEN is not None else True}")
+# print(f"Model ID: {model_id}")
+# print(f"HF_TOKEN presente: {HF_TOKEN is not None}")
+# print(f"HF_TOKEN vuoto: {not HF_TOKEN if HF_TOKEN is not None else True}")
 
 # Client HF Inference
 client = InferenceClient(
@@ -45,7 +45,7 @@ def predict(text):
     except Exception as e:
         err = (
             f"Errore nell'interrogare il Model Hub: {type(e).__name__}: {repr(e)}. "
-            #"Assicurati che il modello sia pubblico o che il token sia corretto."
+            # "Assicurati che il modello sia pubblico o che il token sia corretto."
         )
         return err
 
