@@ -8,5 +8,6 @@ data:
   backtest_chunks: 5 
 
 monitoring:
+  metrics_dataset_id: "gm84/sentiment-analysis-metrics"
   imbalance_ratio: 0.9 
   target_class_to_drop: 2 # 2 = Positive
