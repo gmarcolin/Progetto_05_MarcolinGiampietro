@@ -10,17 +10,17 @@ with open("config.yaml", "r") as f:
 model_id = config["model"]["hub_id"]
 
 # Token HF configurato nei Secrets dello Space
-HF_TOKEN = os.getenv("HF_TOKEN")
+#HF_TOKEN = os.getenv("HF_TOKEN")
 
 # Diagnostica
-print(f"Model ID: {model_id}")
-print(f"HF_TOKEN presente: {HF_TOKEN is not None}")
-print(f"HF_TOKEN vuoto: {not HF_TOKEN if HF_TOKEN is not None else True}")
+#print(f"Model ID: {model_id}")
+#print(f"HF_TOKEN presente: {HF_TOKEN is not None}")
+#print(f"HF_TOKEN vuoto: {not HF_TOKEN if HF_TOKEN is not None else True}")
 
 # Client HF Inference
 client = InferenceClient(
     provider="hf-inference",
-    api_key=HF_TOKEN
+    api_key=os.environ["HF_TOKEN"]
 )
 
 
