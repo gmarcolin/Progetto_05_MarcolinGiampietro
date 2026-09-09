@@ -7,31 +7,47 @@ import os
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
-# Usiamo il token dai segreti di sistema
-HF_TOKEN = os.getenv("HF_TOKEN")
-model_id = config['model']['hub_id']
+model_id = config["model"]["hub_id"]
 
-# Client per le API Serverless di Hugging Face
-client = InferenceClient(model=model_id, token=HF_TOKEN)
+# Token HF configurato nei Secrets dello Space
+HF_TOKEN = os.getenv("HF_TOKEN")
+
+# Diagnostica
+print(f"Model ID: {model_id}")
+print(f"HF_TOKEN presente: {HF_TOKEN is not None}")
+print(f"HF_TOKEN vuoto: {not HF_TOKEN if HF_TOKEN is not None else True}")
+
+# Client HF Inference
+client = InferenceClient(
+    provider="hf-inference",
+    api_key=HF_TOKEN
+)
 
 
 def predict(text):
     try:
-        # Chiamata API al Model Hub
-        response = client.text_classification(text)
-        # Prendiamo il risultato con lo score più alto
-        prediction = max(response, key=lambda x: x['score'])
-        return f"Label: {prediction['label']} (Conf: {prediction['score']:.2f})"
+        response = client.text_classification(
+            text,
+            model=model_id
+        )
+
+        print("Risposta HF:", response)
+
+        prediction = max(response, key=lambda x: x["score"])
+
+        return (
+            f"Label: {prediction['label']} "
+            f"(Conf: {prediction['score']:.2f})"
+        )
 
     except Exception as e:
-        err = (
-            f"Errore nell'interrogare il Model Hub: {str(e)}. "
-            "Assicurati che il modello sia pubblico o che il token sia corretto."
+        print(f"ERRORE: {type(e).__name__}: {repr(e)}")
+
+        return (
+            f"ERRORE: {type(e).__name__}: {repr(e)}"
         )
-        return err
 
 
-# Interfaccia Gradio
 demo = gr.Interface(
     fn=predict,
     inputs=gr.Textbox(placeholder="Inserisci un tweet qui..."),
@@ -41,4 +57,7 @@ demo = gr.Interface(
 )
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=7860
+    )
