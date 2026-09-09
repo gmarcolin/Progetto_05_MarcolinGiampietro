@@ -31,3 +31,42 @@ def load_metrics_data():
             columns=["timestamp", "batch_id", "model_id", "f1_score", "is_drifted", "event_type"]
         )
         return empty_df, f"Nessun dato remoto disponibile ({e})"
+
+
+with gr.Blocks(title="MLOps Monitoring Dashboard") as demo:
+    gr.Markdown("# 📊 Dashboard Monitoraggio Sentiment Model (Twitter-RoBERTa)")
+    gr.Markdown(
+        "Osservabilità del modello: andamento metrica F1 su batch sequenziali, "
+        "rilevamento drift e ripristino post-retraining."
+    )
+
+    status_box = gr.Textbox(label="Stato del Modello in Produzione", interactive=False)
+
+    with gr.Row():
+        refresh_btn = gr.Button("🔄 Aggiorna Metriche", variant="primary")
+
+    gr.Markdown("### Andamento Temporale dell'Indice F1")
+    plot = gr.LinePlot(
+        value=load_metrics_data()[0],
+        x="timestamp",
+        y="f1_score",
+        color="event_type",
+        title="F1-Score per Batch e Tipologia di Evento",
+        y_lim=[0.0, 1.0],
+        tooltip=["batch_id", "model_id", "f1_score", "is_drifted"],
+        width=850,
+        height=380,
+    )
+
+    gr.Markdown("### Storico Run e Log Eventi")
+    table = gr.DataFrame(value=load_metrics_data()[0], interactive=False)
+
+    def update_view():
+        data, status = load_metrics_data()
+        return data, data, status
+
+    refresh_btn.click(fn=update_view, outputs=[plot, table, status_box])
+    demo.load(fn=update_view, outputs=[plot, table, status_box])
+
+if __name__ == "__main__":
+    demo.launch(server_name="0.0.0.0", server_port=7860)
