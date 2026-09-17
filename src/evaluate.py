@@ -1,5 +1,6 @@
 import evaluate
 import yaml
+import pandas as pd
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
 
 with open("config.yaml", "r") as f:
@@ -8,6 +9,10 @@ with open("config.yaml", "r") as f:
 
 def get_model_f1(model_path_or_id: str, test_df):
     """Esegue l'inferenza localmente in batch scaricando i pesi se necessario."""
+    # Se per qualsiasi motivo l'input non è un DataFrame, forzalo
+    if not isinstance(test_df, pd.DataFrame):
+        test_df = pd.DataFrame(test_df)
+
     try:
         tokenizer = AutoTokenizer.from_pretrained(model_path_or_id)
         model = AutoModelForSequenceClassification.from_pretrained(model_path_or_id)

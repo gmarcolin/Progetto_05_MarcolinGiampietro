@@ -1,0 +1,2 @@
+timestamp,batch_id,model_id,f1_score,is_drifted,event_type
+2026-09-09 16:08:20,batch_drifted,gm84/sentiment-analysis-deploy,0.6574,True,drift_detected

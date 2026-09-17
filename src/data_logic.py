@@ -20,8 +20,12 @@ def load_and_validate_data(subset=None):
     return train_df, test_df
 
 
+# def get_backtest_chunks(df, n_chunks=5):
+#     return np.array_split(df, n_chunks)
 def get_backtest_chunks(df, n_chunks=5):
-    return np.array_split(df, n_chunks)
+    """Divide il DataFrame in N finestre temporali simulate mantenendo i DataFrame Pandas."""
+    k, m = divmod(len(df), n_chunks)
+    return [df.iloc[i * k + min(i, m):(i + 1) * k + min(i + 1, m)].copy() for i in range(n_chunks)]
 
 
 def apply_imbalance(df, target_class=2, ratio=0.9):

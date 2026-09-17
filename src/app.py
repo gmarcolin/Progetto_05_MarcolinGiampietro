@@ -54,8 +54,7 @@ with gr.Blocks(title="MLOps Monitoring Dashboard") as demo:
         title="F1-Score per Batch e Tipologia di Evento",
         y_lim=[0.0, 1.0],
         tooltip=["batch_id", "model_id", "f1_score", "is_drifted"],
-        width=850,
-        height=380,
+        height=380,  # <-- Rimosso 'width=850'
     )
 
     gr.Markdown("### Storico Run e Log Eventi")
