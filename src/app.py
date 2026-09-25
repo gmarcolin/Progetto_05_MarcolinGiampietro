@@ -31,7 +31,7 @@ def load_metrics_data():
         except Exception:
             df = None
 
-    if df is None or df.empty:
+    if df is None or df.empty :
         if os.path.exists(METRICS_LOCAL):
             try:
                 df = pd.read_csv(METRICS_LOCAL)
@@ -40,7 +40,7 @@ def load_metrics_data():
                 df = None
 
     # Fallback se il dataset è ancora vuoto o non configurato
-    if df is None or df.empty:
+    if df is None or df.empty :
         empty_df = pd.DataFrame(
             columns=["timestamp", "batch_id", "run_id", "f1_score", "neg_pct", "neu_pct", "pos_pct", "event_type"]
         )
