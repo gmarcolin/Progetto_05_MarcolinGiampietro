@@ -1,16 +1,22 @@
 {
-    "name": "Sentiment MLOps",
-    "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "name": "Sentiment MLOps",
 
-    "features": {},
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
 
-    "postCreateCommand": "python -m pip install -r requirements.txt",
+  "features": {},
 
-    "customizations": {
-        "vscode": {
-            "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python"
-            }
-        }
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.autopep8"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      }
     }
+  },
+
+  "postCreateCommand": "python -m pip install -r requirements.txt"
 }
