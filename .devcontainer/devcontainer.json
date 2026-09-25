@@ -1,24 +1,6 @@
 {
   "name": "Sentiment MLOps",
-
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
-
-  "features": {},
-
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "ms-python.python",
-        "ms-python.vscode-pylance",
-        "ms-python.autopep8"
-      ],
-      "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python",
-        "python.selectInterpreter": "/usr/local/bin/python",
-        "python.terminal.activateEnvironment": true
-      }
-    }
-  },
-
-  "postCreateCommand": "python -m pip install -r requirements.txt"
+  "postCreateCommand": "python -m pip install -r requirements.txt",
+  "features": {}
 }
