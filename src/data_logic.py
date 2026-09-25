@@ -30,7 +30,7 @@ def get_stream_batches(df, n_chunks=5):
     """Divide il flusso in batch sequenziali ordinati per il backtesting temporale."""
     k, m = divmod(len(df), n_chunks)
     return [
-        df.iloc[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)].copy().reset_index(drop=True)
+        df.iloc[i*k + min(i, m):(i + 1)*k + min(i + 1, m)].copy().reset_index(drop=True)
         for i in range(n_chunks)
     ]
 
