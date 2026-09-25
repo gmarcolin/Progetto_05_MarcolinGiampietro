@@ -1,4 +1,6 @@
 {
+  "name": "Sentiment MLOps",  
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
-  "features": {}
+  "features": {},
+  "postCreateCommand": "python -m pip install -r requirements.txt"
 }
