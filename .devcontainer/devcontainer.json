@@ -13,7 +13,9 @@
         "ms-python.autopep8"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python"
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.selectInterpreter": "/usr/local/bin/python",
+        "python.terminal.activateEnvironment": true
       }
     }
   },
