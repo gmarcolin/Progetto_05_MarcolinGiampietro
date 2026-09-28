@@ -27,4 +27,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Token automatico di GitHub
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python src/monitor_simulation.py
+        run: python -m src.monitor_simulation
