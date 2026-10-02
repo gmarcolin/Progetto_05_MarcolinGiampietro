@@ -34,11 +34,11 @@ jobs:
 
       # 5. Test Unitari (Logica interna e validazione)
       - name: Unit Tests
-        run: pytest tests/unit/
+        run: python -m pytest tests/unit/
 
       # 6. Test d'Integrazione (Connessione e Smoke Training)
       # Nota: Qui passiamo l'HF_TOKEN perché lo Smoke Test carica i modelli da HF
       - name: Integration Tests
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: pytest tests/integration/
+        run: python -m pytest tests/integration/
