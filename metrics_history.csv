@@ -1,3 +1,0 @@
-timestamp,batch_id,run_id,model_id,f1_score,neg_pct,neu_pct,pos_pct,is_drifted,event_type
-2026-09-28 10:23:40,batch_1,none,gm84/sentiment-analysis-deploy,0.6938,32.78,26.16,41.05,False,production_stream
-2026-09-28 10:23:53,trigger_batch_1,run_20260928_102341,gm84/sentiment-analysis-deploy,0.6938,32.78,26.16,41.05,True,retrain_triggered

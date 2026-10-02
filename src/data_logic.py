@@ -18,11 +18,10 @@ def load_raw_partitions():
 
     # Test split: congelato come Golden Benchmark Test Set
     golden_test_df = dataset["test"].to_pandas().dropna(subset=["text", "label"])
-    golden_test_df = golden_test_df[golden_test_df["label"].isin(valid_labels)].reset_index(
-        drop=True
-    )
+    golden_test_df = golden_test_df[golden_test_df["label"].isin(valid_labels)].reset_index(drop=True)
 
     logger.info(f"Stream set caricato: {len(stream_df)} righe | Golden Test Set: {len(golden_test_df)} righe")
+
     return stream_df, golden_test_df
 
 

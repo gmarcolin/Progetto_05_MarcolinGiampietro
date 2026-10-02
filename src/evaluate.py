@@ -22,9 +22,9 @@ def evaluate_batch(model_path_or_id: str, batch_df: pd.DataFrame):
         "sentiment-analysis",
         model=model,
         tokenizer=tokenizer,
-        device=-1,  # CPU
-        truncation=True,
-        max_length=128,
+        # device=-1,  # CPU
+        # truncation=True,
+        # max_length=128,
     )
 
     mapping = {"negative": 0, "neutral": 1, "positive": 2}
@@ -36,10 +36,11 @@ def evaluate_batch(model_path_or_id: str, batch_df: pd.DataFrame):
         lbl = p["label"].lower()
         if lbl in mapping:
             y_pred.append(mapping[lbl])
-        elif lbl.startswith("label_"):
-            y_pred.append(int(lbl.split("_")[-1]))
+        # elif lbl.startswith("label_"):
+        #     y_pred.append(int(lbl.split("_")[-1]))
         else:
-            y_pred.append(1)
+            raise ValueError(f"Unexpected model label: {p['label']}")
+            # y_pred.append(1)
 
     y_true = batch_df["label"].tolist()
 
@@ -54,6 +55,7 @@ def evaluate_batch(model_path_or_id: str, batch_df: pd.DataFrame):
     pos_pct = round(float(np.sum(np.array(y_pred) == 2) / total * 100), 2)
 
     distribution = {"neg_pct": neg_pct, "neu_pct": neu_pct, "pos_pct": pos_pct}
+
     return f1_score, distribution
 
 
