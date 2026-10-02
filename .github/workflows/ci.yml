@@ -10,8 +10,8 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: .
+    # env:
+    #   PYTHONPATH: .
     steps:
       # 1. Checkout del codice
       - name: Checkout Code

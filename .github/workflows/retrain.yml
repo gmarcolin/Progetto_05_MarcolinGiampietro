@@ -1,16 +1,20 @@
-name: Model Retraining
+name: Model Retraining & Continuous Delivery
 on:
   repository_dispatch:
     types: [model_decay]
   workflow_dispatch:
     inputs:
       run_id:
-        description: 'Run ID manuale'
-        default: 'manual_run'
+        description: 'Identificativo univoco della Run'
+        default: 'manual_trigger'
 
 jobs:
-  retrain:
+  train_and_evaluate:
+    name: 1. Retrain & Gatekeeper Evaluation
     runs-on: ubuntu-latest
+    outputs:
+      deploy_approved: ${{ steps.retrain_step.outputs.deploy_approved }}
+      challenger_f1: ${{ steps.retrain_step.outputs.challenger_f1 }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -21,65 +25,61 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Retrain on Buffer Snapshot and Evaluate on Golden Benchmark
+      - name: Execute Retraining Script
+        id: retrain_step
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_HUB_ID: ${{ vars.HF_HUB_ID }}
           RUN_ID: ${{ github.event.client_payload.run_id || github.event.inputs.run_id || 'run_manual' }}
+        run: python -m src.retrain
+
+      - name: Save Challenger Model Artifact
+        if: steps.retrain_step.outputs.deploy_approved == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: challenger-weights
+          path: ./challenger
+          retention-days: 1
+
+  deploy_champion:
+    name: 2. Deploy Champion to Model Hub
+    needs: train_and_evaluate
+    if: needs.train_and_evaluate.outputs.deploy_approved == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Hugging Face Hub CLI
+        run: pip install huggingface_hub
+
+      - name: Download Challenger Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: challenger-weights
+          path: ./challenger
+
+      - name: Push New Champion Model to HF Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_HUB_ID: ${{ vars.HF_HUB_ID }}
+          RUN_ID: ${{ github.event.client_payload.run_id || github.event.inputs.run_id || 'run_manual' }}
+          F1_SCORE: ${{ needs.train_and_evaluate.outputs.challenger_f1 }}
         run: |
           python -c "
-          import os, yaml, pandas as pd
-          from huggingface_hub import hf_hub_download
-          from src.data_logic import load_raw_partitions
-          from src.train import train_model
-          from src.evaluate import champion_challenger_check, evaluate_batch
-          from src.metrics_logger import log_batch_metrics
-
-          with open('config.yaml') as f:
-              cfg = yaml.safe_load(f)
-
-          run_id = os.environ.get('RUN_ID', 'run_default')
-          print(f'Esecuzione Retraining per {run_id}...')
-
-          # 1. Scarica il buffer di accumulo salvato nella configurazione 'data' di sentiment-analysis-monitoring
-          snapshot_file = hf_hub_download(
-              repo_id=cfg['monitoring']['monitoring_dataset_id'],
-              filename='data/latest_retrain_buffer.parquet',
-              repo_type='dataset',
-              token=os.environ['HF_TOKEN']
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi()
+          commit_msg = f'deploy: promote challenger to champion | run: {os.environ[\"RUN_ID\"]} | Golden F1: {os.environ[\"F1_SCORE\"]}'
+          api.upload_folder(
+              folder_path='./challenger',
+              repo_id=os.environ['HF_HUB_ID'],
+              repo_type='model',
+              token=os.environ['HF_TOKEN'],
+              commit_message=commit_msg
           )
-          buffer_df = pd.read_parquet(snapshot_file)
-          print(f'Buffer di accumulo scaricato: {len(buffer_df)} record.')
-
-          # 2. Carica il Golden Benchmark Test Set (immutabile)
-          _, golden_test_df = load_raw_partitions()
-
-          # 3. Addestramento Challenger
-          trainer, model, tokenizer = train_model(buffer_df, golden_test_df)
-          model.save_pretrained('./challenger')
-          tokenizer.save_pretrained('./challenger')
-
-          # 4. Sfida Champion vs Challenger sul Golden Benchmark
-          is_better, challenger_f1, champion_f1 = champion_challenger_check('./challenger', golden_test_df)
-          _, dist = evaluate_batch('./challenger', golden_test_df)
-
-          # 5. Log della metrica post-retrain su HF
-          log_batch_metrics(
-              batch_id=f'post_retrain_{run_id}',
-              model_id=os.environ.get('HF_HUB_ID', cfg['model']['hub_id']),
-              f1_score=challenger_f1,
-              distribution=dist,
-              is_drifted=False,
-              event_type='post_retrain_eval',
-              run_id=run_id
-          )
-
-          # 6. Deploy sul Model Hub se approvato
-          if is_better and 'HF_TOKEN' in os.environ:
-              print(f'Challenger approvato ({challenger_f1:.4f} >= {champion_f1:.4f}). Push su Model Hub...')
-              commit_msg = f'deploy: update model champion from {run_id} (F1: {challenger_f1:.4f})'
-              model.push_to_hub(repo_id=os.environ['HF_HUB_ID'], token=os.environ['HF_TOKEN'], commit_message=commit_msg)
-              tokenizer.push_to_hub(repo_id=os.environ['HF_HUB_ID'], token=os.environ['HF_TOKEN'], commit_message=commit_msg)
-          else:
-              print(f'Challenger scartato ({challenger_f1:.4f} < {champion_f1:.4f}). Il Champion rimane invariato.')
+          print('Nuovo Champion rilasciato con successo su Hugging Face Model Hub!')
           "

@@ -1,7 +1,7 @@
-import evaluate
 import numpy as np
 import pandas as pd
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
+from sklearn.metrics import f1_score
 import yaml
 
 with open("config.yaml", "r") as f:
@@ -45,8 +45,9 @@ def evaluate_batch(model_path_or_id: str, batch_df: pd.DataFrame):
     y_true = batch_df["label"].tolist()
 
     # Calcolo F1 pesato
-    f1_metric = evaluate.load("f1", trust_remote_code=True)
-    f1_score = f1_metric.compute(predictions=y_pred, references=y_true, average="weighted")["f1"]
+    # f1_metric = evaluate.load("f1", trust_remote_code=True)
+    # f1_score = f1_metric.compute(predictions=y_pred, references=y_true, average="weighted")["f1"]
+    f1 = f1_score(y_true, y_pred, average="macro")
 
     # Calcolo distribuzione del sentiment predetto (%)
     total = len(y_pred)
@@ -56,7 +57,7 @@ def evaluate_batch(model_path_or_id: str, batch_df: pd.DataFrame):
 
     distribution = {"neg_pct": neg_pct, "neu_pct": neu_pct, "pos_pct": pos_pct}
 
-    return f1_score, distribution
+    return f1, distribution
 
 
 def champion_challenger_check(challenger_dir: str, golden_test_df: pd.DataFrame):

@@ -1,0 +1,14 @@
+transformers
+torch
+datasets
+accelerate
+pandas
+gradio
+pytest
+flake8
+huggingface_hub
+scikit-learn
+requests
+fastapi
+uvicorn
+httpx2
