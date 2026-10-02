@@ -8,6 +8,7 @@ import yaml
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
+
 # Strutture Dati Pydantic per I/O validato
 class PredictionRequest(BaseModel):
     text: str = Field(
@@ -18,11 +19,13 @@ class PredictionRequest(BaseModel):
         }
     )
 
+
 class PredictionResponse(BaseModel):
     text: str
     label: str
     confidence: float
     model_id: str
+
 
 class HealthResponse(BaseModel):
     status: str
