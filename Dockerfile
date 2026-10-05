@@ -1,28 +1,31 @@
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-# Installazione dipendenze di compilazione minime
+# Installazione curl per l'healthcheck
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# 1. Installiamo PyTorch in versione CPU-ONLY (pesa solo ~180MB invece di 2.5GB!)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
-# Copia solo il codice applicativo e la configurazione
+# 2. Installiamo solo le dipendenze essenziali di serving
+COPY requirements-serving.txt .
+RUN pip install --no-cache-dir -r requirements-serving.txt
+
+# 3. Copiamo la configurazione e solo i file sorgente necessari per API e Dashboard
 COPY config.yaml .
-COPY src/ ./src/
+COPY src/api.py ./src/api.py
+COPY src/app.py ./src/app.py
 
-EXPOSE 8000
+EXPOSE 8000 7860
 
-# Healthcheck nativo del container
-HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 CMD ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
