@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Servizio 1: Microservizio REST FastAPI per le predizioni
   sentiment-api:
-    image: ghcr.io/${GITHUB_USER}/${{ github.repository }}/sentiment-api:latest
+    image: ghcr.io/${GITHUB_USER}/sentiment-api:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -21,7 +21,7 @@ services:
 
   # Servizio 2: Dashboard di Monitoraggio e Telemetria (Gradio)
   sentiment-dashboard:
-    image: ghcr.io/${GITHUB_USER}/${{ github.repository }}/sentiment-api:latest
+    image: ghcr.io/${GITHUB_USER}/sentiment-api:latest
     build:
       context: .
       dockerfile: Dockerfile
