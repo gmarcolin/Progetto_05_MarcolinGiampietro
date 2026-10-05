@@ -1,4 +1,20 @@
+# Ambienti virtuali
 .venv/
+
+# Bytecode e cache Python
 __pycache__/
 *.py[cod]
+*.pyc
+
+# Cache strumenti di test e lint
 .gradio
+.pytest_cache/
+results/
+challenger/
+
+# Dati e metriche locali
+*.parquet
+*.csv
+
+# Segreti
+.env

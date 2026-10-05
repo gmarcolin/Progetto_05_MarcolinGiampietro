@@ -1,11 +1,27 @@
-.git
-.github
-venv
-__pycache__
+# Ambienti virtuali
+.venv/
+
+# Bytecode e cache Python
+__pycache__/
+*.py[cod]
 *.pyc
-.pytest_cache
+
+# Cache strumenti di test e lint
+.gradio
+.pytest_cache/
 results/
 challenger/
+
+# Dati e metriche locali
 *.parquet
 *.csv
+
+# Segreti
 .env
+
+# tutto ciò che serve a Git/CI ma NON al container di serving:
+.git/
+.github/
+tests/
+.flake8
+README.md
