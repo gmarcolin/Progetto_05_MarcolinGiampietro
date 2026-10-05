@@ -14,23 +14,27 @@ METRICS_LOCAL = "metrics_history.csv"
 
 def load_metrics_data():
     token = os.getenv("HF_TOKEN")
+    # Se il token è una stringa vuota, impostalo su None per abilitare il download anonimo
+    hf_token = token if token and token.strip() else None
+
     df = None
     source = ""
 
-    if token:
-        try:
-            # Scarica sempre l'ultima versione dal Dataset Hub
-            path = hf_hub_download(
-                repo_id=MONITORING_REPO,
-                filename=METRICS_PATH_REMOTE,
-                repo_type="dataset",
-                token=token,
-            )
-            df = pd.read_csv(path)
-            source = f"HF Dataset ({MONITORING_REPO}/metrics)"
-        except Exception:
-            df = None
+    # 1. Prova SEMPRE a scaricare dal Dataset Hub (anche anonimo se pubblico)
+    try:
+        # Scarica sempre l'ultima versione dal Dataset Hub
+        path = hf_hub_download(
+            repo_id=MONITORING_REPO,
+            filename=METRICS_PATH_REMOTE,
+            repo_type="dataset",
+            token=hf_token,  # Se None, scarica liberamente se il dataset è Public
+        )
+        df = pd.read_csv(path)
+        source = f"HF Dataset ({MONITORING_REPO}/metrics)"
+    except Exception:
+        df = None
 
+    # 2. Fallback su file locale (se presente)
     if df is None or df.empty:
         if os.path.exists(METRICS_LOCAL):
             try:
@@ -44,7 +48,7 @@ def load_metrics_data():
         empty_df = pd.DataFrame(
             columns=["timestamp", "batch_id", "run_id", "f1_score", "neg_pct", "neu_pct", "pos_pct", "event_type"]
         )
-        return empty_df, "Nessun dato disponibile."
+        return empty_df, "Nessun dato di monitoraggio disponibile su Hugging Face."
 
     latest_f1 = df["f1_score"].iloc[-1]
     status = f"Ultima F1: {latest_f1:.4f} | Eventi: {len(df)} | Sorgente: {source}"
