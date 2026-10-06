@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import pandas as pd
 import requests
@@ -54,7 +54,7 @@ def run_stream_monitoring():
 
         # Controllo soglia di performance
         if f1 < config["model"]["threshold_f1"]:
-            run_id = f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+            run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
             print(f"\n[ALERT] Model Decay rilevato su {batch_id} (F1: {f1:.4f} < {config['model']['threshold_f1']})")
             print(f"[MLOps] Generazione snapshot retrain con run_id: {run_id}...")
 

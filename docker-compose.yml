@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Servizio 1: Microservizio REST FastAPI per le predizioni
   sentiment-api:

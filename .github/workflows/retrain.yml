@@ -16,9 +16,9 @@ jobs:
       deploy_approved: ${{ steps.retrain_step.outputs.deploy_approved }}
       challenger_f1: ${{ steps.retrain_step.outputs.challenger_f1 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -47,9 +47,9 @@ jobs:
     if: needs.train_and_evaluate.outputs.deploy_approved == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 

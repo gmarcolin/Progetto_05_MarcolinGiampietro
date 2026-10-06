@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from huggingface_hub import HfApi, hf_hub_download
 import pandas as pd
@@ -42,7 +42,7 @@ def log_batch_metrics(
 
     # 2. Crea la nuova riga
     row = {
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         "batch_id": batch_id,
         "run_id": run_id,
         "model_id": model_id,
