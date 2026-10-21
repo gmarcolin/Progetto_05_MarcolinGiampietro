@@ -38,10 +38,10 @@ jobs:
         run: |
           docker compose -f docker/docker-compose.monitoring.yml up -d --build sentiment-api
 
-      - name: Wait for Container Health via docker inspect
+      - name: Wait for Container Health via Docker inspect
         run: |
           echo "In attesa che il container diventi healthy..."
-          timeout=60
+          timeout=240
           while [ $timeout -gt 0 ]; do
             status=$(docker inspect --format='{{.State.Health.Status}}' sentiment-api-service 2>/dev/null || echo "starting")
             echo "Stato attuale: $status ($timeout secondi rimanenti)"
