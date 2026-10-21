@@ -5,7 +5,7 @@ env/
 
 # Bytecode e cache Python
 __pycache__/
-# *.py[cod]
+*.py[cod]
 *.pyc
 
 # Cache strumenti di test e lint

@@ -1,11 +1,12 @@
 -r requirements.txt
-# torch
-# httpx2
-pytest
-flake8
-httpx
+torch
+requests
+huggingface_hub
 datasets
 accelerate
 scikit-learn
 pandas
+pytest
+flake8
+httpx2
 apache-airflow-client

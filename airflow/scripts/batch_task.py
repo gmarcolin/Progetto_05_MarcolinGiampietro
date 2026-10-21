@@ -63,7 +63,7 @@ def run_inference_task(**context):
     if res.status_code != 200:
         raise RuntimeError(f"Chiamata a {predict_url} fallita ({res.status_code}): {res.text}")
 
-    preds_data = res.json().get("predictions", [])
+    preds_data = res.json()
     preds_path = os.path.join(STAGING_DIR, f"preds_{ds}.json")
     with open(preds_path, "w") as f:
         json.dump(preds_data, f)
@@ -78,7 +78,10 @@ def evaluate_and_log_task(**context):
 
     batch_df = pd.read_parquet(os.path.join(STAGING_DIR, f"batch_{ds}.parquet"))
     with open(os.path.join(STAGING_DIR, f"preds_{ds}.json"), "r") as f:
-        preds_data = json.load(f)
+        response_data = json.load(f)
+
+    preds_data = response_data.get("predictions", [])
+    model_id = response_data.get("model_id", "unknown_model")
 
     mapping = {"negative": 0, "neutral": 1, "positive": 2}
     y_pred = [mapping.get(p["label"], 1) for p in preds_data]
@@ -100,6 +103,7 @@ def evaluate_and_log_task(**context):
 
     log_batch_metrics(
         batch_id=f"batch_{ds}",
+        model_id=model_id,
         f1_score=f1_score,
         distribution=dist,
         is_drifted=is_drifted,

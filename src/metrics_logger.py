@@ -30,10 +30,10 @@ def log_batch_metrics(
     if token:
         try:
             path = hf_hub_download(
-            	repo_id=REPO_ID, 
-            	filename=METRICS_REMOTE_PATH, 
-            	repo_type="dataset", 
-            	token=token
+                repo_id=REPO_ID,
+                filename=METRICS_REMOTE_PATH,
+                repo_type="dataset",
+                token=token
             )
             df_existing = pd.read_csv(path)
         except Exception:

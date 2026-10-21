@@ -21,8 +21,8 @@ PREDICTION_COUNTER = Counter(
 
 # Strutture Dati Pydantic per I/O validato
 class PredictionRequest(BaseModel):
-    text: Optional[str] = Field(None, example="I love this MLOps service!")
-    texts: Optional[list[str]] = Field(None, example=["Great service!", "Terrible delay."])
+    text: Optional[str] = Field(None, json_schema_extra={"example": "I love this MLOps service!"})
+    texts: Optional[list[str]] = Field(None, json_schema_extra={"example": ["Great service!", "Terrible delay."]})
 
 
 class SinglePrediction(BaseModel):
@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
         model = AutoModelForSequenceClassification.from_pretrained(hub_id, token=token)
         app.state.classifier = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
         # app.state.classifier = pipeline(
-        # "sentiment-analysis", model=model, tokenizer=tokenizer, 
+        # "sentiment-analysis", model=model, tokenizer=tokenizer,
         # device=-1, truncation=True, max_length=128
         # )
         app.state.model_id = hub_id
@@ -75,14 +75,14 @@ async def lifespan(app: FastAPI):
             model = AutoModelForSequenceClassification.from_pretrained(base_id)
             app.state.classifier = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
             # app.state.classifier = pipeline(
-            # "sentiment-analysis", model=model, tokenizer=tokenizer, 
+            # "sentiment-analysis", model=model, tokenizer=tokenizer,
             # device=-1, truncation=True, max_length=128
             # )
             app.state.model_id = base_id
         except Exception as e_base:
             # Fallimento irreversibile: esce e blocca l'avvio
             raise RuntimeError(
-                f"Avvio fallito: impossibile caricare né Champion ({e_champ}) né Base ({e_base})"
+                f"Avvio fallito: impossibile caricare né Champion ({e_champion}) né Base ({e_base})"
             )
 
     yield

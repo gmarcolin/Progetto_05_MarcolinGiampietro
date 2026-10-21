@@ -1,8 +1,5 @@
 fastapi
 uvicorn
 transformers
-huggingface_hub
 pyyaml
-requests
 prometheus-fastapi-instrumentator
-prometheus-client

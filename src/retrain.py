@@ -20,9 +20,9 @@ def run_retrain_pipeline(run_id: str = "run_manual"):
     # 1. Download buffer di accumulo da HF Dataset Hub
     print(f"[Retrain] Download buffer da {dataset_repo}/data/latest_retrain_buffer.parquet...")
     path = hf_hub_download(
-        repo_id=dataset_repo, 
-        filename="data/latest_retrain_buffer.parquet", 
-        repo_type="dataset", 
+        repo_id=dataset_repo,
+        filename="data/latest_retrain_buffer.parquet",
+        repo_type="dataset",
         token=token
     )
     buffer_df = pd.read_parquet(path)
