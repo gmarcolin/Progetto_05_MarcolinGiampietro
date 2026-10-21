@@ -1,0 +1,54 @@
+version: '3.8'
+
+networks:
+  mlops-network:
+    external: true
+
+services:
+  sentiment-api:
+    image: ghcr.io/${GITHUB_USER}/sentiment-api:latest
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: sentiment-api-service
+    ports:
+      - "8000:8000"
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+    networks:
+      - mlops-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: sentiment-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - mlops-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: sentiment-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - mlops-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus

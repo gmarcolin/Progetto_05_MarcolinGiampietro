@@ -1,0 +1,28 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: "MLOps Alerts"
+    folder: "Sentiment Drift"
+    interval: 15s
+    rules:
+      - uid: "prediction_drift_positive"
+        title: "Prediction Drift: Positive Sentiment Below 5%"
+        condition: "A"
+        data:
+          - refId: "A"
+            queryType: ""
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "Prometheus"
+            model:
+              editorMode: "code"
+              expr: "sum(rate(sentiment_predictions_total{label='positive'}[5m])) / sum(rate(sentiment_predictions_total[5m])) < 0.05"
+              intervalMs: 1000
+              maxDataPoints: 43200
+        noDataState: "NoData"
+        execErrState: "Error"
+        for: "30s"
+        annotations:
+          summary: "Crollo rilevato nella percentuale di predizioni positive (Data Drift)"

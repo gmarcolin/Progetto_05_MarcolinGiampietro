@@ -1,0 +1,65 @@
+version: '3.8'
+
+networks:
+  mlops-network:
+    external: true
+
+services:
+  airflow-postgres:
+    image: postgres:15-alpine
+    container_name: airflow-postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    networks:
+      - mlops-network
+    restart: unless-stopped
+
+  airflow-webserver:
+    image: apache/airflow:2.9.3-python3.12
+    container_name: airflow-webserver
+    depends_on:
+      - airflow-postgres
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
+    volumes:
+      - ../airflow/dags:/opt/airflow/dags
+      - ../airflow/scripts:/opt/airflow/scripts
+      - ../src:/opt/airflow/src
+      - ../config.yaml:/opt/airflow/config.yaml
+      - ../requirements-dev.txt:/opt/airflow/requirements-dev.txt
+    ports:
+      - "8085:8080"
+    networks:
+      - mlops-network
+    command: >
+      bash -c "pip install --no-cache-dir -r /opt/airflow/requirements-dev.txt &&
+               airflow db migrate &&
+               (airflow users create --username admin --password admin --firstname Admin --lastname Admin --role Admin --email admin@example.com || true) &&
+               airflow webserver"
+
+  airflow-scheduler:
+    image: apache/airflow:2.9.3-python3.12
+    container_name: airflow-scheduler
+    depends_on:
+      - airflow-webserver
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
+    volumes:
+      - ../airflow/dags:/opt/airflow/dags
+      - ../airflow/scripts:/opt/airflow/scripts
+      - ../src:/opt/airflow/src
+      - ../config.yaml:/opt/airflow/config.yaml
+      - ../requirements-dev.txt:/opt/airflow/requirements-dev.txt
+    networks:
+      - mlops-network
+    command: >
+      bash -c "pip install --no-cache-dir -r /opt/airflow/requirements-dev.txt &&
+               airflow scheduler"

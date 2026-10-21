@@ -7,8 +7,8 @@ import yaml
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
-MONITORING_REPO = config["monitoring"]["monitoring_dataset_id"]
-METRICS_PATH_REMOTE = "metrics/metrics_history.csv"
+REPO_ID = config["monitoring"]["monitoring_dataset_id"]
+METRICS_REMOTE_PATH = "metrics/metrics_history.csv"
 METRICS_LOCAL = "metrics_history.csv"
 
 
@@ -29,13 +29,13 @@ def log_batch_metrics(
     df_existing = pd.DataFrame()
     if token:
         try:
-            local_path = hf_hub_download(
-                repo_id=MONITORING_REPO,
-                filename=METRICS_PATH_REMOTE,
-                repo_type="dataset",
-                token=token,
+            path = hf_hub_download(
+            	repo_id=REPO_ID, 
+            	filename=METRICS_REMOTE_PATH, 
+            	repo_type="dataset", 
+            	token=token
             )
-            df_existing = pd.read_csv(local_path)
+            df_existing = pd.read_csv(path)
         except Exception:
             # Primo avvio o dataset vuoto
             df_existing = pd.DataFrame()
@@ -65,13 +65,13 @@ def log_batch_metrics(
         try:
             api.upload_file(
                 path_or_fileobj=METRICS_LOCAL,
-                path_in_repo=METRICS_PATH_REMOTE,
-                repo_id=MONITORING_REPO,
+                path_in_repo=METRICS_REMOTE_PATH,
+                repo_id=REPO_ID,
                 repo_type="dataset",
                 token=token,
-                commit_message=f"telemetry: log batch {batch_id} (F1: {row['f1_score']})",
+                commit_message=f"telemetry: batch {batch_id} (F1: {row['f1_score']})",
             )
-            print(f"[Logger] Metriche salvate in {MONITORING_REPO}/{METRICS_PATH_REMOTE}")
+            print(f"[Logger] Metriche salvate su HF: {REPO_ID}/{METRICS_REMOTE_PATH}")
         except Exception as e:
             print(f"[Logger WARNING] Upload metriche su HF fallito: {e}")
 
@@ -90,7 +90,7 @@ def upload_retrain_snapshot(buffer_df: pd.DataFrame, run_id: str):
             api.upload_file(
                 path_or_fileobj=local_snapshot,
                 path_in_repo=f"data/snapshots/retrain_{run_id}.parquet",
-                repo_id=MONITORING_REPO,
+                repo_id=REPO_ID,
                 repo_type="dataset",
                 token=token,
                 commit_message=f"lineage: snapshot {run_id} ({len(buffer_df)} record)",
@@ -99,12 +99,12 @@ def upload_retrain_snapshot(buffer_df: pd.DataFrame, run_id: str):
             api.upload_file(
                 path_or_fileobj=local_snapshot,
                 path_in_repo="data/latest_retrain_buffer.parquet",
-                repo_id=MONITORING_REPO,
+                repo_id=REPO_ID,
                 repo_type="dataset",
                 token=token,
                 commit_message=f"lineage: update data/latest_retrain_buffer.parquet ({run_id})",
             )
-            print(f"[Lineage] Dati di retrain salvati in {MONITORING_REPO}/data/")
+            print(f"[Lineage] Dati di retrain salvati in {REPO_ID}/data/")
         except Exception as e:
             print(f"[Lineage WARNING] Upload snapshot fallito: {e}")
 

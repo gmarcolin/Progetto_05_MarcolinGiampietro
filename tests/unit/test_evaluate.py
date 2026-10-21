@@ -1,28 +1,26 @@
 import pandas as pd
 import yaml
-from src.evaluate import evaluate_batch
+from src.evaluate import evaluate_offline
 
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 
-def test_model_inference_and_distribution():
+def test_evaluate_offline():
     """Verifica che la funzione di inferenza calcoli correttamente metriche e distribuzioni di sentiment."""
     # Mini-dataset con esempi chiari per le tre classi
-    sample_df = pd.DataFrame(
-        {
-            "text": [
-                "I absolutely love this new MLOps pipeline, it is wonderful!",  # Positivo (2)
-                "This is the worst flight delay ever, terrible service.",  # Negativo (0)
-                "The train arrives at 10:30 am tomorrow morning.",  # Neutro (1)
-            ],
-            "label": [2, 0, 1],
-        }
-    )
+    sample_df = pd.DataFrame({
+        "text": [
+            "I absolutely love this new MLOps pipeline, it is wonderful!",  # Positivo (2)
+            "This is the worst flight delay ever, terrible service.",  # Negativo (0)
+            "The train arrives at 10:30 am tomorrow morning.",  # Neutro (1)
+        ],
+        "label": [2, 0, 1]
+    })
 
     # Testiamo l'inferenza usando il modello base configurato
     model_to_test = config["model"]["base_name"]
-    f1_score, distribution = evaluate_batch(model_to_test, sample_df)
+    f1_score, distribution = evaluate_offline(model_to_test, sample_df)
 
     # Asserzioni su integrità dell'output
     assert isinstance(f1_score, float)

@@ -1,31 +1,35 @@
 name: Model Retraining & Continuous Delivery
+
 on:
   repository_dispatch:
     types: [model_decay]
   workflow_dispatch:
     inputs:
       run_id:
-        description: 'Identificativo univoco della Run'
-        default: 'manual_trigger'
+        description: 'Run ID manuale'
+        default: 'manual_run'
 
 jobs:
   train_and_evaluate:
-    name: 1. Retrain & Gatekeeper Evaluation
+    name: 1. Retrain Challenger & Gatekeeper Check
     runs-on: ubuntu-latest
     outputs:
       deploy_approved: ${{ steps.retrain_step.outputs.deploy_approved }}
       challenger_f1: ${{ steps.retrain_step.outputs.challenger_f1 }}
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+          cache: 'pip'
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install Dev Dependencies
+        run: pip install -r requirements-dev.txt
 
-      - name: Execute Retraining Script
+      - name: Run Retraining Module
         id: retrain_step
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -42,44 +46,32 @@ jobs:
           retention-days: 1
 
   deploy_champion:
-    name: 2. Deploy Champion to Model Hub
+    name: 2. Deploy Champion to Hugging Face Model Hub
     needs: train_and_evaluate
     if: needs.train_and_evaluate.outputs.deploy_approved == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - name: Install Hugging Face Hub CLI
-        run: pip install huggingface_hub
+      - name: Install Minimal Hub Tools
+        run: pip install huggingface_hub pyyaml
 
-      - name: Download Challenger Artifact
+      - name: Download Challenger Weights
         uses: actions/download-artifact@v4
         with:
           name: challenger-weights
           path: ./challenger
 
-      - name: Push New Champion Model to HF Hub
+      - name: Run Deploy Module
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_HUB_ID: ${{ vars.HF_HUB_ID }}
           RUN_ID: ${{ github.event.client_payload.run_id || github.event.inputs.run_id || 'run_manual' }}
           F1_SCORE: ${{ needs.train_and_evaluate.outputs.challenger_f1 }}
-        run: |
-          python -c "
-          import os
-          from huggingface_hub import HfApi
-          api = HfApi()
-          commit_msg = f'deploy: promote challenger to champion | run: {os.environ[\"RUN_ID\"]} | Golden F1: {os.environ[\"F1_SCORE\"]}'
-          api.upload_folder(
-              folder_path='./challenger',
-              repo_id=os.environ['HF_HUB_ID'],
-              repo_type='model',
-              token=os.environ['HF_TOKEN'],
-              commit_message=commit_msg
-          )
-          print('Nuovo Champion rilasciato con successo su Hugging Face Model Hub!')
-          "
+        run: python -m src.deploy

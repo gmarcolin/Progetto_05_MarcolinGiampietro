@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-gradio
-transformers
-pandas
-pyyaml
-huggingface_hub
-requests

@@ -1,0 +1,11 @@
+-r requirements.txt
+# torch
+# httpx2
+pytest
+flake8
+httpx
+datasets
+accelerate
+scikit-learn
+pandas
+apache-airflow-client

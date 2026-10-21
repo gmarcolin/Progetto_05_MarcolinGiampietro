@@ -6,10 +6,12 @@ model:
 data:
   dataset_name: "mteb/tweet_sentiment_extraction"
   backtest_chunks: 15 # numero finestre temporali (batch) in cui suddividere il train set
+  start_date: "2026-09-01"
 
 monitoring:
   monitoring_dataset_id: "gm84/sentiment-analysis-monitoring"
-  
+  api_url: "http://sentiment-api:8000"
+
   # Dizionario dei drift: specifichiamo solo i batch in cui alterare i dati
   # Tutti gli altri batch non elencati saranno considerati traffico standard
   drift_schedule:
@@ -19,7 +21,3 @@ monitoring:
     11:
       target_class: 2     # 0= negative, 1= neutral, 2 = positive
       imbalance_ratio: 0.96 # Secondo calo (più severo)
-
-  polling:
-    interval_seconds: 30 # Intervallo di controllo verso GitHub Actions
-    timeout_seconds: 1800  # Timeout massimo (30 minuti)

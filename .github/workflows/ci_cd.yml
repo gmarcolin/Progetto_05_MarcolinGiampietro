@@ -1,0 +1,128 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test_and_validate:
+    name: 1. CI - Tests, Build & Live Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip' # Velocizza i workflow successivi
+
+      - name: Install Dev Dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Linting
+        run: flake8 .
+
+      - name: Unit Tests
+        run: python -m pytest tests/unit/
+
+      - name: Create External Docker Network
+        run: docker network create mlops-network || true
+
+      - name: Build & Start API Container via Docker Compose
+        env:
+          GITHUB_USER: ${{ github.actor }}
+        run: |
+          docker compose -f docker/docker-compose.monitoring.yml up -d --build sentiment-api
+
+      - name: Wait for Container Health via docker inspect
+        run: |
+          echo "In attesa che il container diventi healthy..."
+          timeout=60
+          while [ $timeout -gt 0 ]; do
+            status=$(docker inspect --format='{{.State.Health.Status}}' sentiment-api-service 2>/dev/null || echo "starting")
+            echo "Stato attuale: $status ($timeout secondi rimanenti)"
+            if [ "$status" = "healthy" ]; then
+              echo "Container certificato HEALTHY da Docker!"
+              break
+            elif [ "$status" = "unhealthy" ]; then
+              echo "Container UNHEALTHY!"
+              docker logs sentiment-api-service
+              exit 1
+            fi
+            sleep 3
+            timeout=$((timeout - 3))
+          done
+
+          if [ $timeout -le 0 ]; then
+            echo "Timeout attesa salute container!"
+            docker logs sentiment-api-service
+            exit 1
+          fi
+
+      - name: Live Smoke Test on /health
+        run: |
+          res=$(curl -s http://localhost:8000/health)
+          echo "Risposta /health: $res"
+          status=$(echo $res | grep -o '"status":"[^"]*' | cut -d'"' -f4)
+          if [ "$status" = "healthy" ]; then
+            echo "Smoke test PASSED: Modello Champion attivo."
+          elif [ "$status" = "degraded" ]; then
+            echo "::warning:: Smoke test PASSED in modalità DEGRADED (Fallback attivo)."
+          else
+            echo "Smoke test FAILED: status imprevisto ($status)"
+            exit 1
+          fi
+
+      - name: Integration Tests
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}		# passiamo l'HF_TOKEN perché lo Smoke Test carica i modelli da HF
+        run: python -m pytest tests/integration/
+
+      - name: Teardown Docker Compose
+        if: always()
+        run: docker compose -f docker/docker-compose.monitoring.yml down -v
+
+  publish_image:
+    name: 2. CD - Publish Docker Image to GHCR
+    needs: test_and_validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Permesso per pubblicare su GitHub Packages / GHCR
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/sentiment-api
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - name: Build and Push Docker Image to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

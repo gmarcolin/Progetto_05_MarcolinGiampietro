@@ -8,8 +8,8 @@ with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 
-def evaluate_batch(model_path_or_id: str, batch_df: pd.DataFrame):
-    """Valuta un batch calcolando F1-score e la distribuzione percentuale del sentiment predetto."""
+def evaluate_offline(model_path_or_id: str, df: pd.DataFrame):
+    """Valuta il modello in memoria (usato per il Gatekeeper Challenger vs Champion)."""
     try:
         tokenizer = AutoTokenizer.from_pretrained(model_path_or_id)
         model = AutoModelForSequenceClassification.from_pretrained(model_path_or_id)
@@ -18,17 +18,11 @@ def evaluate_batch(model_path_or_id: str, batch_df: pd.DataFrame):
         tokenizer = AutoTokenizer.from_pretrained(config["model"]["base_name"])
         model = AutoModelForSequenceClassification.from_pretrained(config["model"]["base_name"])
 
-    pipe = pipeline(
-        "sentiment-analysis",
-        model=model,
-        tokenizer=tokenizer,
-        # device=-1,  # CPU
-        # truncation=True,
-        # max_length=128,
-    )
-
+    pipe = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
+    # pipe = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer, device=-1, truncation=True, max_length=128)
     mapping = {"negative": 0, "neutral": 1, "positive": 2}
-    texts = batch_df["text"].astype(str).tolist()
+
+    texts = df["text"].astype(str).tolist()
     preds = pipe(texts, batch_size=16)
 
     y_pred = []
@@ -42,7 +36,7 @@ def evaluate_batch(model_path_or_id: str, batch_df: pd.DataFrame):
             raise ValueError(f"Unexpected model label: {p['label']}")
             # y_pred.append(1)
 
-    y_true = batch_df["label"].tolist()
+    y_true = df["label"].tolist()
 
     # Calcolo F1 pesato
     # f1_metric = evaluate.load("f1", trust_remote_code=True)
@@ -51,22 +45,21 @@ def evaluate_batch(model_path_or_id: str, batch_df: pd.DataFrame):
 
     # Calcolo distribuzione del sentiment predetto (%)
     total = len(y_pred)
-    neg_pct = round(float(np.sum(np.array(y_pred) == 0) / total * 100), 2)
-    neu_pct = round(float(np.sum(np.array(y_pred) == 1) / total * 100), 2)
-    pos_pct = round(float(np.sum(np.array(y_pred) == 2) / total * 100), 2)
-
-    distribution = {"neg_pct": neg_pct, "neu_pct": neu_pct, "pos_pct": pos_pct}
-
-    return f1, distribution
+    dist = {
+        "neg_pct": round(float(np.sum(np.array(y_pred) == 0) / total * 100), 2),
+        "neu_pct": round(float(np.sum(np.array(y_pred) == 1) / total * 100), 2),
+        "pos_pct": round(float(np.sum(np.array(y_pred) == 2) / total * 100), 2),
+    }
+    return f1, dist
 
 
 def champion_challenger_check(challenger_dir: str, golden_test_df: pd.DataFrame):
     """Confronta Challenger e Champion esclusivamente sul Golden Benchmark Test Set."""
     try:
-        champion_f1, _ = evaluate_batch(config["model"]["hub_id"], golden_test_df)
+        champion_f1, _ = evaluate_offline(config["model"]["hub_id"], golden_test_df)
     except Exception:
-        champion_f1, _ = evaluate_batch(config["model"]["base_name"], golden_test_df)
+        champion_f1, _ = evaluate_offline(config["model"]["base_name"], golden_test_df)
 
-    challenger_f1, _ = evaluate_batch(challenger_dir, golden_test_df)
+    challenger_f1, _ = evaluate_offline(challenger_dir, golden_test_df)
     print(f"[Gatekeeper] Champion F1: {champion_f1:.4f} | Challenger F1: {challenger_f1:.4f}")
     return challenger_f1 >= champion_f1, challenger_f1, champion_f1
