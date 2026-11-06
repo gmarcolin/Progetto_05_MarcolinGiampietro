@@ -1,6 +1,6 @@
-# networks:
-#   mlops-network:
-#     external: true
+networks:
+  mlops-network:
+    external: true
 
 services:
   sentiment-api:
