@@ -1,6 +1,9 @@
 from datetime import datetime
+import io
 import json
 import os
+from zipfile import ZipFile
+from airflow.exceptions import AirflowSkipException
 from airflow.models import Variable
 import evaluate
 import numpy as np
@@ -17,6 +20,18 @@ STAGING_DIR = "/tmp/airflow_staging"
 os.makedirs(STAGING_DIR, exist_ok=True)
 
 
+def parse_label_to_id(val) -> int:
+    if isinstance(val, int):
+        return val
+    val_str = str(val).lower().strip()
+    mapping = {
+        "negative": 0, "0": 0, "label_0": 0,
+        "neutral": 1, "1": 1, "label_1": 1,
+        "positive": 2, "2": 2, "label_2": 2,
+    }
+    return mapping.get(val_str, 1)
+
+
 def ingest_batch_task(**context):
     """Task 1: Preleva il batch per la data corrente, inietta il drift se previsto e salva lo staging."""
     ds = context["ds"]
@@ -24,7 +39,7 @@ def ingest_batch_task(**context):
     batch_df = get_batch_by_date(stream_df, ds)
 
     if batch_df.empty:
-        raise ValueError(f"Nessun dato disponibile per event_date: {ds}")
+        raise ValueError(f"Nessun dato trovato per event_date: {ds}")
 
     # Indice numerico del giorno per il drift schedule
     chunk_idx = int(ds.split("-")[-1])
@@ -83,9 +98,8 @@ def evaluate_and_log_task(**context):
     preds_data = response_data.get("predictions", [])
     model_id = response_data.get("model_id", "unknown_model")
 
-    mapping = {"negative": 0, "neutral": 1, "positive": 2}
-    y_pred = [mapping.get(p["label"], 1) for p in preds_data]
-    y_true = batch_df["label"].tolist()
+    y_pred = [parse_label_to_id(p["label"]) for p in preds_data]
+    y_true = [parse_label_to_id(lbl) for lbl in batch_df["label"]]
 
     f1_metric = evaluate.load("f1", trust_remote_code=True)
     f1_score = f1_metric.compute(predictions=y_pred, references=y_true, average="weighted")["f1"]
@@ -144,23 +158,119 @@ def trigger_retraining_task(**context):
     upload_retrain_snapshot(buffer_df, run_id=run_id)
     print(f"[Retrain Trigger] Snapshot {run_id} caricato su HF ({len(buffer_df)} record).")
 
-    token_gh = os.getenv("GITHUB_TOKEN")
-    repo_gh = os.getenv("GITHUB_REPOSITORY")
+    token = os.getenv("GITHUB_TOKEN")
+    repo = os.getenv("GITHUB_REPOSITORY")
 
-    if token_gh and repo_gh:
-        dispatch_url = f"https://api.github.com/repos/{repo_gh}/dispatches"
+    if token and repo:
+        url = f"https://api.github.com/repos/{repo}/dispatches"
         headers = {
-            "Authorization": f"token {token_gh}",
-            "Accept": "application/vnd.github.v3+json",
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
         }
         payload = {
             "event_type": "model_decay",
-            "client_payload": {"run_id": run_id, "trigger_date": ds},
+            "client_payload": {"run_id": run_id}
         }
-        res = requests.post(dispatch_url, json=payload, headers=headers)
+        res = requests.post(url, json=payload, headers=headers)
         if res.status_code == 204:
-            print(f"[Retrain Trigger] Dispatch inviato a GitHub Actions per {run_id}.")
+            print(f"[Airflow Task] Retrain trigger inviato a GitHub Actions per {run_id}.")
         else:
             raise RuntimeError(f"Errore dispatch ({res.status_code}): {res.text}")
     else:
         print("[Retrain Trigger Warning] GITHUB_TOKEN o GITHUB_REPOSITORY non impostati.")
+
+    context["ti"].xcom_push(key="run_id", value=run_id)
+
+
+def gatekeep_and_decide_task(**context):
+    """
+    Task Gatekeeper (puro, senza polling):
+    Recupera l'artifact del retraining, valuta le metriche e decide se avviare il deploy.
+    """
+    ti = context["ti"]
+    token = os.getenv("GITHUB_TOKEN")
+    repo = os.getenv("GITHUB_REPOSITORY")
+    retrain_run_id = ti.xcom_pull(task_ids="wait_retrain_sensor", key="retrain_run_id")
+    run_id = ti.xcom_pull(task_ids="trigger_retraining", key="run_id")
+
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+
+    # Download eval_results.json
+    artifacts_url = f"https://api.github.com/repos/{repo}/actions/runs/{retrain_run_id}/artifacts"
+    art_res = requests.get(artifacts_url, headers=headers).json()
+    artifact_id = next(a["id"] for a in art_res.get("artifacts", []) if a["name"] == "eval-results")
+
+    zip_res = requests.get(
+        f"https://api.github.com/repos/{repo}/actions/artifacts/{artifact_id}/zip", headers=headers
+    )
+    with ZipFile(io.BytesIO(zip_res.content)) as z:
+        eval_data = json.loads(z.read("eval_results.json"))
+
+    cand_f1 = eval_data["candidate_f1"]
+    champ_f1 = eval_data["champion_f1"]
+    threshold = config["model"]["threshold_f1"]
+
+    print(f"[Gatekeeper Policy] Challenger F1: {cand_f1} vs Champion F1: {champ_f1} (Soglia: {threshold})")
+
+    if cand_f1 >= champ_f1 and cand_f1 >= threshold:
+        print("[Gatekeeper Policy] APPROVATO: Innesco workflow Deploy...")
+        requests.post(
+            f"https://api.github.com/repos/{repo}/dispatches",
+            headers=headers,
+            json={
+                "event_type": "model_approved",
+                "client_payload": {"run_id": run_id, "retrain_run_id": retrain_run_id},
+            },
+        )
+        ti.xcom_push(key="deploy_approved", value=True)
+    else:
+        print("[Gatekeeper Policy] RESPINTO: Challenger non conforme.")
+        ti.xcom_push(key="deploy_approved", value=False)
+        raise AirflowSkipException("Challenger respinto dal Gatekeeper. Deploy saltato.")
+
+
+def hot_reload_and_verify_task(**context):
+    """
+    Task Hot-Reload e Rollback (puro, senza polling):
+    Scarica il commit_sha approvato, aggiorna l'API ed esegue rollback se il controllo /health fallisce.
+    """
+    ti = context["ti"]
+    token = os.getenv("GITHUB_TOKEN")
+    repo = os.getenv("GITHUB_REPOSITORY")
+    deploy_run_id = ti.xcom_pull(task_ids="wait_deploy_sensor", key="deploy_run_id")
+    api_url = os.environ.get("SENTIMENT_API_URL", config["monitoring"].get("api_url", "http://sentiment-api:8000"))
+
+    # Recupero vecchio SHA prima dell'aggiornamento
+    initial_health = requests.get(f"{api_url}/health").json()
+    old_revision = initial_health.get("model_revision", "base-fallback")
+
+    # Download deploy_result.json
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+    artifacts_url = f"https://api.github.com/repos/{repo}/actions/runs/{deploy_run_id}/artifacts"
+    art_res = requests.get(artifacts_url, headers=headers).json()
+    artifact_id = next(a["id"] for a in art_res.get("artifacts", []) if a["name"] == "deploy-result")
+
+    zip_res = requests.get(
+        f"https://api.github.com/repos/{repo}/actions/artifacts/{artifact_id}/zip", headers=headers
+    )
+    with ZipFile(io.BytesIO(zip_res.content)) as z:
+        deploy_data = json.loads(z.read("deploy_result.json"))
+
+    new_revision = deploy_data["commit_sha"]
+
+    print(f"[Hot-Reload] Richiesta POST /reload?revision={new_revision}...")
+    requests.post(f"{api_url}/reload", params={"revision": new_revision})
+
+    # Verifica dello stato
+    health = requests.get(f"{api_url}/health").json()
+    if health.get("status") == "healthy" and health.get("model_revision") == new_revision:
+        print(f"🎉 [Deploy Success] Hot-reload verificato: servizio su revisione {new_revision}")
+        Variable.set("last_promoted_event_date", context["ds"])
+    else:
+        print(f"⚠️ [Deploy Warning] Nuovo modello instabile. Innesco Rollback a {old_revision}...")
+        requests.post(f"{api_url}/reload", params={"revision": old_revision})
+        health_rb = requests.get(f"{api_url}/health").json()
+        if health_rb.get("model_revision") == old_revision:
+            raise RuntimeError(f"ALERT (Warning): Rilascio fallito ma Rollback riuscito a {old_revision}.")
+        else:
+            raise SystemError("CRITICAL ALERT (P1): Servizio di produzione compromesso. Fallito anche il rollback!")

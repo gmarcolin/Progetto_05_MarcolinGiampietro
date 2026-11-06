@@ -1,0 +1,51 @@
+name: Model Deployment (Champion Promotion)
+
+on:
+  repository_dispatch:
+    types: [model_approved]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Run ID manuale'
+        default: 'manual_run'
+      retrain_run_id:
+        description: 'GitHub Action Run ID del retraining'
+        required: false
+
+jobs:
+  deploy_champion:
+    name: Publish Champion to Hugging Face Model Hub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Minimal Hub Tools
+        run: pip install huggingface_hub pyyaml requests
+
+      - name: Download Challenger Weights Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: challenger-weights
+          path: ./challenger
+          run-id: ${{ github.event.client_payload.retrain_run_id || github.event.inputs.retrain_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Deploy Module
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_HUB_ID: ${{ vars.HF_HUB_ID }}
+          RUN_ID: ${{ github.event.client_payload.run_id || github.event.inputs.run_id || 'run_manual' }}
+        run: python -m src.deploy
+
+      - name: Upload Deploy Result Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-result
+          path: deploy_result.json
+          retention-days: 1

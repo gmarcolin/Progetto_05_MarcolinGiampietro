@@ -1,20 +1,19 @@
+import json
 import os
 from huggingface_hub import hf_hub_download
 import pandas as pd
 import yaml
 from src.data_logic import load_raw_partitions
-from src.evaluate import champion_challenger_check, evaluate_offline
-from src.metrics_logger import log_batch_metrics
+from src.evaluate import champion_challenger_check
 from src.train import train_model
 
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 
-def run_retrain_pipeline(run_id: str = "run_manual"):
-    print(f"\n================ AVVIO RETRAINING PIPELINE [{run_id}] ================")
+def run_retrain_job(run_id: str = "manual_retrain"):
+    print(f"\n================ AVVIO RETRAINING JOB [{run_id}] ================")
     dataset_repo = config["monitoring"]["monitoring_dataset_id"]
-    model_hub_id = os.environ.get("HF_HUB_ID", config["model"]["hub_id"])
     token = os.environ.get("HF_TOKEN")
 
     # 1. Download buffer di accumulo da HF Dataset Hub
@@ -38,36 +37,22 @@ def run_retrain_pipeline(run_id: str = "run_manual"):
     model.save_pretrained(challenger_dir)
     tokenizer.save_pretrained(challenger_dir)
 
-    # 4. Sfida Champion vs Challenger sul Golden Benchmark
-    is_better, challenger_f1, champion_f1 = champion_challenger_check(challenger_dir, golden_test_df)
-    _, dist = evaluate_offline(challenger_dir, golden_test_df)
+    # 4. Valutazione Champion e Challenger sul Golden Benchmark
+    chall_f1, champ_f1 = champion_challenger_check(challenger_dir, golden_test_df)
 
-    # 5. Log delle metriche di validazione post-retrain su HF
-    log_batch_metrics(
-        batch_id=f"post_retrain_{run_id}",
-        model_id=model_hub_id,
-        f1_score=challenger_f1,
-        distribution=dist,
-        is_drifted=False,
-        event_type="post_retrain_eval",
-        run_id=run_id,
-    )
+    # 5. Passaggio dati da GitHub Actions ad Airflow
+    results = {
+        "candidate_f1": round(float(chall_f1), 4),
+        "champion_f1": round(float(champ_f1), 4),
+        "run_id": run_id,
+    }
+    with open("eval_results.json", "w") as f:
+        json.dump(results, f, indent=2)
 
-    # 6. Scrittura output per GitHub Actions
-    github_output = os.environ.get("GITHUB_OUTPUT")
-    if github_output:
-        with open(github_output, "a") as f:
-            f.write(f"deploy_approved={str(is_better).lower()}\n")
-            f.write(f"challenger_f1={challenger_f1:.4f}\n")
-            f.write(f"champion_f1={champion_f1:.4f}\n")
-
-    decision_str = "APPROVATO" if is_better else "RESPINTO"
-    print(
-        f"[Gatekeeper] Esito: {decision_str} | Challenger F1: {challenger_f1:.4f} vs Champion F1: {champion_f1:.4f}"
-    )
-    return is_better, challenger_f1
+    print(f"[Retrain Job] Risultati generati: {results}")
+    return results
 
 
 if __name__ == "__main__":
     current_run_id = os.environ.get("RUN_ID", "local_run")
-    run_retrain_pipeline(run_id=current_run_id)
+    run_retrain_job(run_id=current_run_id)

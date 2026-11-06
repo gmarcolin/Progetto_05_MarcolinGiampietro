@@ -4,11 +4,14 @@ from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import BranchPythonOperator, PythonOperator
 from airflow.scripts.batch_tasks import (
     evaluate_and_log_task,
+    gatekeep_and_decide_task,
+    hot_reload_and_verify_task,
     ingest_batch_task,
     model_decay_branch_task,
     run_inference_task,
     trigger_retraining_task,
 )
+from airflow.scripts.sensors import GitHubWorkflowSensor
 
 default_args = {
     "owner": "mlops",
@@ -22,7 +25,7 @@ default_args = {
 with DAG(
     dag_id="sentiment_stream_batch_monitoring",
     default_args=default_args,
-    description="Pipeline di monitoraggio continuo batch-per-batch con controllo del drift",
+    description="Orchestrazione streaming di dati e ciclo di vita del modello",
     schedule_interval="@daily",
     start_date=datetime(2026, 9, 1),
     end_date=datetime(2026, 9, 15),
@@ -37,7 +40,7 @@ with DAG(
         provide_context=True,
     )
 
-    # 2. Chiamata all'API /predict con policy di retry strette e timeout
+    # 2. Inferenza batch con retry e timeout
     task_inference = PythonOperator(
         task_id="run_inference",
         python_callable=run_inference_task,
@@ -47,7 +50,7 @@ with DAG(
         execution_timeout=timedelta(minutes=3),
     )
 
-    # 3. Calcolo metriche F1 pesato e logging su Hugging Face
+    # 3. Valutazione F1 e log metriche su Hugging Face
     task_evaluate = PythonOperator(
         task_id="evaluate_metrics",
         python_callable=evaluate_and_log_task,
@@ -61,17 +64,54 @@ with DAG(
         provide_context=True,
     )
 
-    # 5a. Ramo A: Decay rilevato -> Upload snapshot su HF e trigger GitHub Actions
-    task_trigger = PythonOperator(
+    # 5. Ramo Nominale (nessun drift)
+    task_pass = EmptyOperator(
+        task_id="decay_not_detected",
+    )
+
+    # 6. Ramo Retraining: Upload snapshot su HF e trigger GitHub Actions
+    task_trigger_retrain = PythonOperator(
         task_id="trigger_retraining",
         python_callable=trigger_retraining_task,
         provide_context=True,
     )
 
-    # 5b. Ramo B: Performance nominali -> No-op
-    task_pass = EmptyOperator(
-        task_id="decay_not_detected",
+    # 7. SENSOR 1: Attesa retraining su GitHub
+    sensor_wait_retrain = GitHubWorkflowSensor(
+        task_id="wait_retrain_sensor",
+        workflow_name="Model Retraining (Challenger)",
+        xcom_push_key="retrain_run_id",
+        mode="reschedule",
+        poke_interval=30,
+        timeout=1800,  # 30 min max
     )
 
-    # Definizione delle dipendenze del grafo
-    task_ingest >> task_inference >> task_evaluate >> task_branch >> [task_trigger, task_pass]
+    # 8. TASK DECISIONALE: Gatekeeper check su Golden Benchmark
+    task_gatekeep = PythonOperator(
+        task_id="gatekeep_and_decide",
+        python_callable=gatekeep_and_decide_task,
+        provide_context=True,
+    )
+
+    # 9. SENSOR 2: Attesa deploy su GitHub
+    sensor_wait_deploy = GitHubWorkflowSensor(
+        task_id="wait_deploy_sensor",
+        workflow_name="Model Deployment (Champion Promotion)",
+        xcom_push_key="deploy_run_id",
+        check_deploy_gate=True,
+        mode="reschedule",
+        poke_interval=20,
+        timeout=600,  # 10 min max
+    )
+
+    # 10. HOT-RELOAD & VERIFY: Chiamata POST /reload, check /health e rollback
+    task_hot_reload = PythonOperator(
+        task_id="hot_reload_and_verify",
+        python_callable=hot_reload_and_verify_task,
+        provide_context=True,
+    )
+
+    # Definizione del grafo delle dipendenze
+    task_ingest >> task_inference >> task_evaluate >> task_branch
+    task_branch >> task_pass
+    task_branch >> task_trigger_retrain >> sensor_wait_retrain >> task_gatekeep >> sensor_wait_deploy >> task_hot_reload

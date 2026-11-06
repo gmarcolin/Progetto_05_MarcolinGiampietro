@@ -11,11 +11,8 @@ on:
 
 jobs:
   train_and_evaluate:
-    name: 1. Retrain Challenger & Gatekeeper Check
+    name: Retrain Challenger & Golden Benchmark Evaluation
     runs-on: ubuntu-latest
-    outputs:
-      deploy_approved: ${{ steps.retrain_step.outputs.deploy_approved }}
-      challenger_f1: ${{ steps.retrain_step.outputs.challenger_f1 }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
@@ -30,48 +27,22 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Run Retraining Module
-        id: retrain_step
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_HUB_ID: ${{ vars.HF_HUB_ID }}
           RUN_ID: ${{ github.event.client_payload.run_id || github.event.inputs.run_id || 'run_manual' }}
         run: python -m src.retrain
 
-      - name: Save Challenger Model Artifact
-        if: steps.retrain_step.outputs.deploy_approved == 'true'
+      - name: Upload Challenger Weights Artifact
         uses: actions/upload-artifact@v4
         with:
           name: challenger-weights
           path: ./challenger
           retention-days: 1
 
-  deploy_champion:
-    name: 2. Deploy Champion to Hugging Face Model Hub
-    needs: train_and_evaluate
-    if: needs.train_and_evaluate.outputs.deploy_approved == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Upload Evaluation Results Artifact
+        uses: actions/upload-artifact@v4
         with:
-          python-version: '3.12'
-
-      - name: Install Minimal Hub Tools
-        run: pip install huggingface_hub pyyaml
-
-      - name: Download Challenger Weights
-        uses: actions/download-artifact@v4
-        with:
-          name: challenger-weights
-          path: ./challenger
-
-      - name: Run Deploy Module
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_HUB_ID: ${{ vars.HF_HUB_ID }}
-          RUN_ID: ${{ github.event.client_payload.run_id || github.event.inputs.run_id || 'run_manual' }}
-          F1_SCORE: ${{ needs.train_and_evaluate.outputs.challenger_f1 }}
-        run: python -m src.deploy
+          name: eval-results
+          path: eval_results.json
+          retention-days: 1

@@ -9,6 +9,7 @@ def test_health_endpoint():
         data = res.json()
         assert data["status"] in ["healthy", "degraded"]
         assert "model_id" in data
+        assert "model_revision" in data
         assert isinstance(data["fallback_active"], bool)
 
 
@@ -32,3 +33,9 @@ def test_predict_batch_texts():
         preds = data["predictions"]
         assert isinstance(preds, list)
         assert len(preds) == 2
+
+
+def test_reload_endpoint():
+    with TestClient(app) as client:
+        res = client.post("/reload", params={"revision": "base-fallback"})
+        assert res.status_code in [200, 500]

@@ -62,4 +62,4 @@ def champion_challenger_check(challenger_dir: str, golden_test_df: pd.DataFrame)
 
     challenger_f1, _ = evaluate_offline(challenger_dir, golden_test_df)
     print(f"[Gatekeeper] Champion F1: {champion_f1:.4f} | Challenger F1: {challenger_f1:.4f}")
-    return challenger_f1 >= champion_f1, challenger_f1, champion_f1
+    return challenger_f1, champion_f1

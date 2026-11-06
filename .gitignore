@@ -17,6 +17,8 @@ challenger/
 *.parquet
 *.csv
 airflow/logs/
+eval_results.json
+deploy_result.json
 
 # Segreti
 .env

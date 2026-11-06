@@ -3,7 +3,7 @@ import pandas as pd
 from src.metrics_logger import METRICS_LOCAL, log_batch_metrics
 
 
-def test_local_metric_logging():
+def test_metrics_logging():
     dist = {"neg_pct": 10.0, "neu_pct": 20.0, "pos_pct": 70.0}
 
     log_batch_metrics(

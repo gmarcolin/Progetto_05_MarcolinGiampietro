@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 import os
 from typing import Optional, Union
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from prometheus_client import Counter
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
@@ -33,58 +33,51 @@ class SinglePrediction(BaseModel):
 class PredictionResponse(BaseModel):
     predictions: Union[SinglePrediction, list[SinglePrediction]]
     model_id: str
+    model_revision: Optional[str]
     fallback_active: bool
 
 
 class HealthResponse(BaseModel):
     status: str  # healthy | degraded
     model_id: str
+    model_revision: Optional[str]
     fallback_active: bool
     fallback_reason: Optional[str] = None
+
+
+def load_model_pipeline(revision: Optional[str] = None):
+    """Caricamento del modello in memoria."""
+    token = os.getenv("HF_TOKEN")
+    hub_id = config["model"]["hub_id"]
+    base_id = config["model"]["base_name"]
+
+    # Tentativo 1: Carica Champion da HF Model Hub
+    try:
+        tok = AutoTokenizer.from_pretrained(hub_id, token=token, revision=revision)
+        mod = AutoModelForSequenceClassification.from_pretrained(hub_id, token=token, revision=revision)
+        pipe = pipeline("sentiment-analysis", model=mod, tokenizer=tok,)  # device=-1, truncation=True, max_length=128)
+        return pipe, hub_id, revision or "latest", False, None
+    except Exception as e_champ:
+        # Tentativo 2: Fallback su modello base
+        try:
+            tok = AutoTokenizer.from_pretrained(base_id)
+            mod = AutoModelForSequenceClassification.from_pretrained(base_id)
+            pipe = pipeline("sentiment-analysis", model=mod, tokenizer=tok,)  # device=-1, truncation=True, max_length=128)
+            return pipe, base_id, "base-fallback", True, str(e_champ)
+        except Exception as e_base:
+            # Fallimento irreversibile: esce e blocca l'avvio
+            raise RuntimeError(f"Avvio fallito: impossibile caricare né Champion ({e_champ}) né Base ({e_base})")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Caricamento asincrono del modello in memoria all'avvio del container."""
-    token = os.getenv("HF_TOKEN")
-    hub_id = config["model"]["hub_id"]
-    base_id = config["model"]["base_name"]
-
-    app.state.classifier = None
-    app.state.model_id = None
-    app.state.fallback_active = False
-    app.state.fallback_reason = None
-
-    # Tentativo 1: Carica Champion da HF Model Hub
-    try:
-        app.state.fallback_active = False
-        tokenizer = AutoTokenizer.from_pretrained(hub_id, token=token)
-        model = AutoModelForSequenceClassification.from_pretrained(hub_id, token=token)
-        app.state.classifier = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
-        # app.state.classifier = pipeline(
-        # "sentiment-analysis", model=model, tokenizer=tokenizer,
-        # device=-1, truncation=True, max_length=128
-        # )
-        app.state.model_id = hub_id
-    except Exception as e_champion:
-        app.state.fallback_active = True
-        app.state.fallback_reason = str(e_champion)
-        # Tentativo 2: Fallback su modello base
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(base_id)
-            model = AutoModelForSequenceClassification.from_pretrained(base_id)
-            app.state.classifier = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
-            # app.state.classifier = pipeline(
-            # "sentiment-analysis", model=model, tokenizer=tokenizer,
-            # device=-1, truncation=True, max_length=128
-            # )
-            app.state.model_id = base_id
-        except Exception as e_base:
-            # Fallimento irreversibile: esce e blocca l'avvio
-            raise RuntimeError(
-                f"Avvio fallito: impossibile caricare né Champion ({e_champion}) né Base ({e_base})"
-            )
-
+    pipe, model_id, rev, fallback_act, fallback_rsn = load_model_pipeline()
+    app.state.classifier = pipe
+    app.state.model_id = model_id
+    app.state.model_revision = rev
+    app.state.fallback_active = fallback_act
+    app.state.fallback_reason = fallback_rsn
     yield
     app.state.classifier = None
 
@@ -104,15 +97,30 @@ Instrumentator().instrument(app).expose(app)
 def health_check():
     """Endpoint di stato per Kubernetes, Docker e Load Balancer."""
     if not hasattr(app.state, "classifier") or app.state.classifier is None:
-        raise HTTPException(status_code=503, detail="Modello non inizializzato")
+        raise HTTPException(status_code=503, detail="Modello non pronto")
 
-    current_status = "degraded" if app.state.fallback_active else "healthy"
+    status = "degraded" if app.state.fallback_active else "healthy"
     return HealthResponse(
-        status=current_status,
+        status=status,
         model_id=app.state.model_id,
+        model_revision=app.state.model_revision,
         fallback_active=app.state.fallback_active,
         fallback_reason=app.state.fallback_reason,
     )
+
+
+@app.post("/reload", response_model=HealthResponse)
+def reload_model(revision: Optional[str] = Query(None, description="Commit SHA o revisione da caricare")):
+    try:
+        pipe, model_id, rev, fallback_act, fallback_rsn = load_model_pipeline(revision=revision)
+        app.state.classifier = pipe
+        app.state.model_id = model_id
+        app.state.model_revision = rev
+        app.state.fallback_active = fallback_act
+        app.state.fallback_reason = fallback_rsn
+        return health_check()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Hot-reload fallito: {str(e)}")
 
 
 @app.post("/predict", response_model=PredictionResponse)
@@ -128,7 +136,7 @@ def predict_sentiment(payload: PredictionRequest):
     elif payload.texts is not None and len(payload.texts) > 0:
         texts = payload.texts
     else:
-        raise HTTPException(status_code=422, detail="Fornire 'text' oppure 'texts'")
+        raise HTTPException(status_code=422, detail="Specificare 'text' o 'texts'")
 
     try:
         raw_preds = app.state.classifier(texts, batch_size=16)
@@ -150,6 +158,7 @@ def predict_sentiment(payload: PredictionRequest):
         return PredictionResponse(
             predictions=response_content,
             model_id=app.state.model_id,
+            model_revision=app.state.model_revision,
             fallback_active=app.state.fallback_active,
         )
     except Exception as e:

@@ -1,4 +1,5 @@
 import os
+import pytest
 import requests
 
 
@@ -9,10 +10,9 @@ def test_live_container_endpoints():
         assert health_res.status_code == 200
         data = health_res.json()
         assert data["status"] in ["healthy", "degraded"]
+        assert "model_revision" in data
 
-        pred_res = requests.post(f"{api_url}/predict", json={"text": "Live test text"}, timeout=10)
+        pred_res = requests.post(f"{api_url}/predict", json={"text": "Live test"}, timeout=10)
         assert pred_res.status_code == 200
     except requests.exceptions.ConnectionError:
-        # Se il container non è attivo in locale, salta il test
-        import pytest
-        pytest.skip(f"Endpoint live {api_url} non raggiungibile.")
+        pytest.skip(f"API Live non raggiungibile su {api_url}")
