@@ -1,6 +1,6 @@
-networks:
-  mlops-network:
-    external: true
+# networks:
+#   mlops-network:
+#     external: true
 
 services:
   sentiment-api:
@@ -13,12 +13,12 @@ services:
       - "8000:8000"
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
-    networks:
-      - mlops-network
+    # networks:
+    #   - mlops-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 20s
+      interval: 10s
       timeout: 5s
       retries: 50
       start_period: 25s
