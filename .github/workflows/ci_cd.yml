@@ -53,8 +53,8 @@ jobs:
               docker logs sentiment-api-service
               exit 1
             fi
-            sleep 3
-            timeout=$((timeout - 3))
+            sleep 10
+            timeout=$((timeout - 10))
           done
 
           if [ $timeout -le 0 ]; then
