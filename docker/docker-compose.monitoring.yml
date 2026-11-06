@@ -15,13 +15,15 @@ services:
       - HF_TOKEN=${HF_TOKEN:-}
     networks:
       - mlops-network
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8000/health"]
-      # test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
       timeout: 5s
-      retries: 50
+      retries: 5
       start_period: 25s
 
   prometheus:

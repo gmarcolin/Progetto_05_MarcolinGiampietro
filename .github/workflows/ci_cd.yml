@@ -41,7 +41,7 @@ jobs:
       - name: Wait for Container Health via Docker inspect
         run: |
           echo "In attesa che il container diventi healthy..."
-          timeout=240
+          timeout=60
           while [ $timeout -gt 0 ]; do
             status=$(docker inspect --format='{{.State.Health.Status}}' sentiment-api-service 2>/dev/null || echo "starting")
             echo "Stato attuale: $status ($timeout secondi rimanenti)"
@@ -53,8 +53,8 @@ jobs:
               docker logs sentiment-api-service
               exit 1
             fi
-            sleep 10
-            timeout=$((timeout - 10))
+            sleep 3
+            timeout=$((timeout - 3))
           done
 
           if [ $timeout -le 0 ]; then
