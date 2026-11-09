@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import io
 import json
 import os
@@ -149,7 +149,7 @@ def trigger_retraining_task(**context):
     """Task 5a: Genera lo snapshot dei dati accumulati dal deploy e invia il dispatch a GitHub."""
     ds = context["ds"]
     last_promoted = Variable.get("last_promoted_event_date", default_var="2026-09-01")
-    run_id = f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
 
     print(f"[Retrain Trigger] Accumulo dati da {last_promoted} a {ds}...")
     stream_df, _ = load_raw_partitions()
