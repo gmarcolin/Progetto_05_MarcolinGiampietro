@@ -5,9 +5,9 @@ import os
 from zipfile import ZipFile
 from airflow.exceptions import AirflowSkipException
 from airflow.models import Variable
-import evaluate
 import numpy as np
 import pandas as pd
+from sklearn.metrics import f1_score
 import requests
 import yaml
 from src.data_logic import apply_drift, get_batch_by_date, get_buffer_since_date, load_raw_partitions
@@ -101,8 +101,9 @@ def evaluate_and_log_task(**context):
     y_pred = [parse_label_to_id(p["label"]) for p in preds_data]
     y_true = [parse_label_to_id(lbl) for lbl in batch_df["label"]]
 
-    f1_metric = evaluate.load("f1", trust_remote_code=True)
-    f1_score = f1_metric.compute(predictions=y_pred, references=y_true, average="weighted")["f1"]
+    # f1_metric = evaluate.load("f1", trust_remote_code=True)
+    # f1_score = f1_metric.compute(predictions=y_pred, references=y_true, average="weighted")["f1"]
+    f1 = f1_score(y_true, y_pred, average="macro")
 
     total = len(y_pred)
     dist = {
@@ -118,15 +119,15 @@ def evaluate_and_log_task(**context):
     log_batch_metrics(
         batch_id=f"batch_{ds}",
         model_id=model_id,
-        f1_score=f1_score,
+        f1_score=f1,
         distribution=dist,
         is_drifted=is_drifted,
         event_type=event_type,
     )
 
-    print(f"[Evaluation] F1 = {f1_score:.4f} | Distribuzione: {dist}")
+    print(f"[Evaluation] F1 = {f1:.4f} | Distribuzione: {dist}")
     # Esporta l'F1-score verso XCom per il branch operator
-    ti.xcom_push(key="f1_score", value=f1_score)
+    ti.xcom_push(key="f1_score", value=f1)
 
 
 def model_decay_branch_task(**context):

@@ -15,9 +15,6 @@ services:
       - HF_TOKEN=${HF_TOKEN:-}
     networks:
       - mlops-network
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
